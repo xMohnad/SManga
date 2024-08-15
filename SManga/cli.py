@@ -61,7 +61,7 @@ def cli(link, spider, file, overwrite, list):
         return
 
     if not is_valid_url(link):
-        click.echo(f"The Link '{link}' is invalid.")
+        click.echo(f"The Link '{link}' is invalid.", err=True)
 
     try:
         output_file_path = os.path.join(use_dir, file)

@@ -20,22 +20,22 @@ class Madara(scrapy.Spider):
     allowed_domains = []
     base_url = ""
 
-    next_selector = ".select-pagination .nav-next a:not(.back)::attr(href)"
-    home_selector = "#chapter-heading > a.back::attr(href)"
-
     manganame = None
     cover = None
-    scraped_home = False
 
     def start_requests(self):
         yield scrapy.Request(self.url, dont_filter=True)
 
+    next_page_selector = ".select-pagination .nav-next a:not(.back)::attr(href)"
+    home_selector = "#chapter-heading > a.back::attr(href)"
     title_selector = ".c-breadcrumb .active::text"
 
+    scraped_info = True
+
     def parse(self, response: Response):
-        if not self.scraped_home:
-            self.scraped_home = True
-            self.get_info(response)
+        if self.scraped_info:
+            self.scraped_info = False
+            self.extract_info(response)
             if not self.manganame or not self.cover:
                 home_url = response.css(self.home_selector).get()
                 if home_url:
@@ -56,10 +56,11 @@ class Madara(scrapy.Spider):
         item["document_location"] = response.url
 
         yield item
-        next_page_url = response.css(self.next_selector).get()
+        next_page_url = response.css(self.next_page_selector).get()
         if next_page_url:
             yield response.follow(url=next_page_url.strip(), callback=self.parse)
 
+    # extract image
     chapter_selector = "div.page-break img, li.blocks-gallery-item img, .reading-content .text-left:not(:has(.blocks-gallery-item)) img"
     chapter_protector_selector = "#chapter-protector-data"
 
@@ -94,25 +95,50 @@ class Madara(scrapy.Spider):
         img_list_string = json.loads(decrypted_text.encode("utf-8"))
         return json.loads(img_list_string)
 
+    # extract mangaName and cover manga
+    extract_info_from_script = False
+
     manganame_xpath = '//li[@class="active"]/preceding-sibling::li[1]/a/text()'
     cover_selector = "head > meta[property^='og:image']::attr(content)"
-
-    def get_info(self, response: Response):
-        manganame = response.xpath(self.manganame_xpath).get()
-        if manganame:
-            self.manganame = manganame.strip()
-        self.cover = response.css(self.cover_selector).get()
 
     home_manganame_selector = ".tab-summary .post-title > h1::text"
     home_cover_selector = ".tab-summary .summary_image > a > img"
 
+    def extract_info(self, response: Response):
+        if self.extract_info_from_script:
+            self.extract_info_in_script(response)
+        else:
+            manganame = response.xpath(self.manganame_xpath).get()
+            if manganame:
+                self.manganame = manganame.strip()
+            self.cover = response.css(self.cover_selector).get()
+
+
+        
+    def extract_info_in_script(self, response: Response):
+        json_ld_data = response.xpath(
+            '//script[@type="application/ld+json"]/text()'
+        ).get()
+        if json_ld_data:
+            try:
+                data: dict = json.loads(json_ld_data)
+                self.manganame = data.get("headline", self.manganame)
+                self.cover = data.get("image", {}).get("url", self.cover)
+            except json.JSONDecodeError as e:
+                self.logger.error(f"Failed to decode JSON-LD: {e}")
+
     def get_info_and_retry(self, response: Response):
-        self.manganame = response.css(self.home_manganame_selector).get().strip()
+        manganame = response.css(self.home_manganame_selector).get()
+        if manganame:
+            self.manganame = manganame.strip()
+
         self.cover = self.image_from_element(response.css(self.home_cover_selector))
+
         retry_url = response.meta.get("retry")
         if retry_url:
             yield scrapy.Request(url=retry_url, callback=self.parse, dont_filter=True)
 
+    #
     @staticmethod
     def image_from_element(element: Selector) -> str:
         for attr in ["data-lazy-src", "data-src", "srcset", "data-cfsrc", "src"]:
