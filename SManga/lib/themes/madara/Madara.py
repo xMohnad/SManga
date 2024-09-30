@@ -1,102 +1,27 @@
 import base64
 import json
 import re
-import scrapy
 from scrapy.http import Response
-from scrapy.selector import Selector
+from typing import List, Optional
 
-from SManga.items import ChapterItem
 from SManga.lib.cryptoaes import CryptoAES
-
-# response.css("head > meta[property^='og:image']").xpath("@content") > cover
-# response.css(".c-breadcrumb li:nth-child(3) > a::text").get().strip() > name
-# response.css(".c-breadcrumb .active::text").get().strip() > title
-# response.css("#manga-reading-nav-foot .select-pagination .nav-next > a::attr(href)").get() > next
-# chapter_img_selector = "div.page-break, li.blocks-gallery-item, .reading-content .text-left:not(:has(.blocks-gallery-item)) img"
+from SManga.lib.themes import BaseSpider
 
 
-class Madara(scrapy.Spider):
+class Madara(BaseSpider):
     name = ""
-    allowed_domains = []
     base_url = ""
 
     manganame = None
     cover = None
-
-    def start_requests(self):
-        yield scrapy.Request(self.url, dont_filter=True)
+    extract_details_from_script = False
 
     next_page_selector = ".select-pagination .nav-next a:not(.back)::attr(href)"
     home_selector = "#chapter-heading > a.back::attr(href)"
     title_selector = ".c-breadcrumb .active::text"
 
-    scraped_info = True
-
-    def parse(self, response: Response):
-        if self.scraped_info:
-            self.scraped_info = False
-            self.extract_info(response)
-            if not self.manganame or not self.cover:
-                home_url = response.css(self.home_selector).get()
-                if home_url:
-                    yield scrapy.Request(
-                        url=home_url,
-                        callback=self.get_info_and_retry,
-                        meta={"retry": response.url},
-                        dont_filter=True,
-                    )
-                    return
-
-        item = ChapterItem()
-
-        item["manganame"] = self.manganame
-        item["cover"] = self.cover
-        item["title"] = response.css(self.title_selector).get().strip()
-        item["images"] = self.parse_chapter_image(response)
-        item["document_location"] = response.url
-
-        yield item
-        next_page_url = response.css(self.next_page_selector).get()
-        if next_page_url:
-            yield response.follow(url=next_page_url.strip(), callback=self.parse)
-
-    # extract image
     chapter_selector = "div.page-break img, li.blocks-gallery-item img, .reading-content .text-left:not(:has(.blocks-gallery-item)) img"
     chapter_protector_selector = "#chapter-protector-data"
-
-    def parse_chapter_image(self, response: Response):
-        image = response.css(self.chapter_selector)
-        if image:
-            return [self.image_from_element(img).strip() for img in image]
-        return self.parse_protector_image(response)
-
-    def parse_protector_image(self, response: Response) -> list:
-        chapter_protector = response.css(self.chapter_protector_selector).get()
-        if not chapter_protector:
-            return []
-
-        password = re.search(
-            r"wpmangaprotectornonce='(.*?)';", chapter_protector
-        ).group(1)
-        chapter_data_str = (
-            re.search(r"chapter_data='(.*?)';", chapter_protector)
-            .group(1)
-            .replace("\\/", "/")
-        )
-        chapter_data = json.loads(chapter_data_str)
-
-        salted = b"Salted__"
-        salt = bytes.fromhex(chapter_data["s"])
-        unsalted_ciphertext = base64.b64decode(chapter_data["ct"])
-
-        ciphertext = salted + salt + unsalted_ciphertext
-        decrypted_text = CryptoAES.decrypt(base64.b64encode(ciphertext), password)
-
-        img_list_string = json.loads(decrypted_text.encode("utf-8"))
-        return json.loads(img_list_string)
-
-    # extract mangaName and cover manga
-    extract_info_from_script = False
 
     manganame_xpath = '//li[@class="active"]/preceding-sibling::li[1]/a/text()'
     cover_selector = "head > meta[property^='og:image']::attr(content)"
@@ -104,46 +29,103 @@ class Madara(scrapy.Spider):
     home_manganame_selector = ".tab-summary .post-title > h1::text"
     home_cover_selector = ".tab-summary .summary_image > a > img"
 
-    def extract_info(self, response: Response):
-        if self.extract_info_from_script:
-            self.extract_info_in_script(response)
+    def extract_next_page_url(self, response: Response) -> Optional[str]:
+        return response.css(self.next_page_selector).get().strip()
+
+    def extract_home_url(self, response: Response) -> Optional[str]:
+        return response.css(self.home_selector).get()
+
+    def extract_title(self, response: Response) -> str:
+        return response.css(self.title_selector).get(default="").strip()
+
+    # Extract chapter images
+
+    def parse_chapter_image(self, response: Response) -> List[str]:
+        images = self.get_images_from_page(response)
+        return images if images else self.parse_protector_image(response)
+
+    def get_images_from_page(self, response: Response) -> list:
+        images = response.css(self.chapter_selector)
+        return (
+            [self.image_from_element(img).strip() for img in images] if images else []
+        )
+
+    def parse_protector_image(self, response: Response) -> list:
+        protector_data = self.get_protector_data(response)
+        if not protector_data:
+            return []
+
+        password = self.get_password_from_protector(protector_data)
+        chapter_data_str = self.get_chapter_data_str(protector_data)
+        decrypted_text = self.decrypt_chapter_data(chapter_data_str, password)
+
+        return json.loads(decrypted_text)
+
+    def get_protector_data(self, response: Response):
+        return response.css(self.chapter_protector_selector).get()
+
+    def get_password_from_protector(self, protector_data: str):
+        return re.search(r"wpmangaprotectornonce='(.*?)';", protector_data).group(1)
+
+    def get_chapter_data_str(self, protector_data: str):
+        return (
+            re.search(r"chapter_data='(.*?)';", protector_data)
+            .group(1)
+            .replace("\\/", "/")
+        )
+
+    def decrypt_chapter_data(self, chapter_data_str: str, password: str):
+        chapter_data = json.loads(chapter_data_str)
+        salted = b"Salted__"
+        salt = bytes.fromhex(chapter_data["s"])
+        unsalted_ciphertext = base64.b64decode(chapter_data["ct"])
+
+        ciphertext = salted + salt + unsalted_ciphertext
+        decrypted_text = CryptoAES.decrypt(base64.b64encode(ciphertext), password)
+        return decrypted_text
+
+    # Extract manga details
+
+    def extract_manga_name_from_home(self, response: Response):
+        manga_name = response.css(self.home_manganame_selector).get()
+        return manga_name.strip() if manga_name else None
+
+    def extract_cover_from_home(self, response: Response) -> Optional[str]:
+        return self.image_from_element(response.css(self.home_cover_selector))
+
+    # extract details from current page
+
+    def extract_manga_details(self, response: Response):
+        if self.extract_details_from_script:
+            self.extract_details_in_script(response)
         else:
-            manganame = response.xpath(self.manganame_xpath).get()
-            if manganame:
-                self.manganame = manganame.strip()
-            self.cover = response.css(self.cover_selector).get()
+            self.manganame = self.extract_manga_name(response)
+            self.cover = self.extract_cover(response)
 
+    def extract_manga_name(self, response: Response):
+        return response.xpath(self.manganame_xpath).get().strip()
 
-        
-    def extract_info_in_script(self, response: Response):
-        json_ld_data = response.xpath(
-            '//script[@type="application/ld+json"]/text()'
-        ).get()
+    def extract_cover(self, response: Response):
+        return response.css(self.cover_selector).get()
+
+    def extract_details_in_script(self, response: Response):
+        json_ld_data = self.get_json_ld_data(response)
         if json_ld_data:
-            try:
-                data: dict = json.loads(json_ld_data)
-                self.manganame = data.get("headline", self.manganame)
-                self.cover = data.get("image", {}).get("url", self.cover)
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Failed to decode JSON-LD: {e}")
+            self.parse_json_ld_data(json_ld_data)
 
-    def get_info_and_retry(self, response: Response):
-        manganame = response.css(self.home_manganame_selector).get()
-        if manganame:
-            self.manganame = manganame.strip()
+    def get_json_ld_data(self, response: Response):
+        return response.xpath('//script[@type="application/ld+json"]/text()').get()
 
-        self.cover = self.image_from_element(response.css(self.home_cover_selector))
+    def parse_json_ld_data(self, json_ld_data: str):
+        try:
+            data = json.loads(json_ld_data)
+            self.manganame = self.get_manganame_in_json_ld(data)
+            self.cover = self.get_cover_in_json_ld(data)
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to decode JSON-LD: {e}")
 
-        retry_url = response.meta.get("retry")
-        if retry_url:
-            yield scrapy.Request(url=retry_url, callback=self.parse, dont_filter=True)
+    def get_cover_in_json_ld(self, data):
+        return data.get("image", {}).get("url", self.cover)
 
-    #
-    @staticmethod
-    def image_from_element(element: Selector) -> str:
-        for attr in ["data-lazy-src", "data-src", "srcset", "data-cfsrc", "src"]:
-            if element.attrib.get(attr):
-                if "srcset" in attr:
-                    return element.attrib["srcset"].split(" ")[0]
-                return element.attrib.get(attr)
-        return ""
+    def get_manganame_in_json_ld(self, data):
+        return data.get("headline", self.manganame)

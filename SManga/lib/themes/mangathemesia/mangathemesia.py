@@ -1,85 +1,71 @@
-import scrapy
-from SManga.items import ChapterItem
-from scrapy.http import Response
-from scrapy.selector import Selector
 import json
 import base64
+from typing import Optional
+from scrapy.http import Response
+from SManga.lib.themes import BaseSpider
 
-# script_base64_selector ="script[src^='data:text/javascript;base64,dHNfcmVhZGVyLnJ1bih7']"
 
-
-class MangaThemesiaSpider(scrapy.Spider):
+class MangaThemesiaSpider(BaseSpider):
     name = ""
-    allowed_domains = []
     base_url = ""
+    extract_details_from_current_page: bool = False
 
-    cover_selector = ".infomanga > div[itemprop=image] img, .thumb img"
     manganame_selector = "div.infox > h1::text"
-    title_selector = "div.headpost > h1::text"
-    script_xpath = "//script[contains(text(),'ts_reader')]//text()"
+    cover_selector = ".infomanga > div[itemprop=image] img, .thumb img"
 
-    #  "ts_reader.run({" in base64
+    title_selector = "div.headpost > h1::text"
+    home_page_selector = "div.headpost > div > a::attr(href)"
+
+    script_xpath = "//script[contains(text(),'ts_reader')]//text()"
     script_base64_xpath = '//script[starts-with(@src, "data:text/javascript;base64,dHNfcmVhZGVyLnJ1bih7")]'
 
     manganame = None
     cover = None
 
-    def start_requests(self):
-        yield scrapy.Request(self.url, dont_filter=True)
+    def extract_title(self, response: Response) -> str:
+        title = response.css(self.title_selector).get()
+        return title.split("–")[-1].strip() if title else ""
 
-    def parse(self, response: Response):
-        if not self.manganame or not self.cover:
-            home_url = response.css("div.headpost > div > a::attr(href)").get()
-            if home_url:
-                yield scrapy.Request(
-                    url=home_url,
-                    callback=self.get_info_and_retry,
-                    meta={"retry": response.url},
-                    dont_filter=True,
-                )
-                return
+    def extract_home_url(self, response: Response) -> str:
+        return response.css(self.home_page_selector).get()
 
-        item, next_url = self.extract_data(response)
+    def extract_next_page_url(self, response: Response) -> Optional[str]:
+        script_content = self.get_script_content(response)
+        if not script_content:
+            return None
+        ts_reader = self.parse_script_content(script_content)
+        return ts_reader.get("nextUrl")
 
-        yield item
 
-        if next_url:
-            yield scrapy.Request(url=next_url, callback=self.parse)
+    # Extract chapter images
 
-    def extract_data(self, response: Response):
-        script_con = (
+    def parse_chapter_image(self, response: Response) -> list[str]:
+        script_content = self.get_script_content(response)
+        if not script_content:
+            return []
+        ts_reader = self.parse_script_content(script_content)
+        return self.get_chapter(ts_reader)
+
+    def get_chapter(self, ts_reader: dict):
+        return ts_reader.get("sources", [""])[0].get("images", [])
+
+    # Extract manga details
+
+    def extract_manga_name_from_home(self, response: Response) -> str:
+        return response.css(self.manganame_selector).get()
+
+    def extract_cover_from_home(self, response: Response) -> str:
+        return self.image_from_element(response.css(self.cover_selector))
+
+    # Methods for extracting specific data
+
+    def get_script_content(self, response: Response):
+        return (
             response.xpath(self.script_xpath).get()
             or response.xpath(self.script_base64_xpath).get()
         )
-        if not script_con:
-            return None, None
 
-        ts_reader = self.parse_script_content(script_con)
-        sources = ts_reader.get("sources", [])
-
-        item = ChapterItem()
-
-        item["manganame"] = self.manganame
-        item["cover"] = self.cover
-        item["title"] = response.css(self.title_selector).get()
-        item["images"] = sources[0].get("images", [])
-        item["document_location"] = response.url
-
-        return item, ts_reader.get("nextUrl")
-
-    def get_info_and_retry(self, response: Response):
-        self.manganame = response.css(self.manganame_selector).get()
-        self.cover = self.img_attr(response.css(self.cover_selector))
-        retry_url = response.meta.get("retry")
-        if retry_url:
-            yield response.follow(url=retry_url, callback=self.parse, dont_filter=True)
-
-    def img_attr(self, element: Selector):
-        for attr in ["data-lazy-src", "data-src", "data-cfsrc", "src"]:
-            if element.attrib.get(attr):
-                return element.attrib.get(attr)
-        return None
-
+    # Method to handle script content parsing
     def parse_script_content(self, script_content):
         if "base64," in script_content:
             script_content = self.base64_to_str(script_content)

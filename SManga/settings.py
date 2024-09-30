@@ -14,7 +14,7 @@ NEWSPIDER_MODULE = "SManga.spiders"
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-# USER_AGENT = "SManga (+http://www.yourdomain.com)"
+# USER_AGENT = None
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
@@ -52,6 +52,11 @@ ROBOTSTXT_OBEY = False
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 # DOWNLOADER_MIDDLEWARES = {
 #    "SManga.middlewares.SmangaDownloaderMiddleware": 543,
+# }
+
+# DOWNLOADER_MIDDLEWARES = {
+#     'scrapy_fake_useragent.middleware.RandomUserAgentMiddleware': 400,
+#     'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
 # }
 
 # Enable or disable extensions
