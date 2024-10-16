@@ -4,6 +4,7 @@ from SManga.lib.themes import BaseSpider
 class TeamxSpider(BaseSpider):
     name = "TeamX"
     base_url = "https://teamoney.site/"
+    language = "Ara"
     extract_details_from_current_page = False
 
     manganame_selector = "div.author-info-title h6::text"

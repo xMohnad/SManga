@@ -11,6 +11,7 @@ from SManga.lib.themes import BaseSpider
 class Madara(BaseSpider):
     name = ""
     base_url = ""
+    language: str = ""
 
     manganame = None
     cover = None
@@ -30,7 +31,7 @@ class Madara(BaseSpider):
     home_cover_selector = ".tab-summary .summary_image > a > img"
 
     def extract_next_page_url(self, response: Response) -> Optional[str]:
-        return response.css(self.next_page_selector).get().strip()
+        return response.css(self.next_page_selector).get(default="").strip()
 
     def extract_home_url(self, response: Response) -> Optional[str]:
         return response.css(self.home_selector).get()
@@ -57,7 +58,7 @@ class Madara(BaseSpider):
 
         password = self.get_password_from_protector(protector_data)
         chapter_data_str = self.get_chapter_data_str(protector_data)
-        decrypted_text = self.decrypt_chapter_data(chapter_data_str, password)
+        decrypted_text = json.loads(self.decrypt_chapter_data(chapter_data_str, password))
 
         return json.loads(decrypted_text)
 

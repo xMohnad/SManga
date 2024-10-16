@@ -16,6 +16,7 @@ class BaseSpider(scrapy.Spider):
     """
     name: str = ""
     base_url: str = ""
+    language: str = ""
 
     manganame: Optional[str] = None
     """
@@ -61,7 +62,7 @@ class BaseSpider(scrapy.Spider):
             home_url = self.handle_initial_scraping(response)
             if home_url:
                 yield self.retry_scraping_with_home_url(response, home_url)
-            return
+                return
 
         yield self.create_chapter_item(response)
 

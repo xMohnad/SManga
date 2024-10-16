@@ -8,6 +8,8 @@ from SManga.lib.themes import BaseSpider
 class MangaThemesiaSpider(BaseSpider):
     name = ""
     base_url = ""
+    language: str = ""
+
     extract_details_from_current_page: bool = False
 
     manganame_selector = "div.infox > h1::text"
