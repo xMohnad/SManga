@@ -1,5 +1,5 @@
 scrapy>=2.11.2
-Click>=8.1.7
-click-completion
 pycryptodome>=3.20.0
+typer
+rich
 windows-curses; platform_system=='Windows'

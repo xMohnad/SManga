@@ -1,21 +1,22 @@
 from setuptools import setup, find_packages
 
+def parse_requirements(filename):
+    with open(filename, "r", encoding="utf8") as f:
+        requirements = f.read().strip().split("\n")
+        requirements = [
+            r.strip() for r in requirements if r.strip() and not r.startswith("#")
+        ]
+        return requirements
+
 setup(
     name="SManga",
-    version="0.3",
+    version="0.3.2",
     description="A CLI tool for scraping manga chapters using Scrapy",
     packages=find_packages(),
-    install_requires=[
-        "scrapy>=2.11.2",
-        "pycryptodome>=3.20.0",
-        "Click>=8.1.7",
-        "windows-curses; platform_system=='Windows'",
-        "click-completion",
-    ], # "scrapy-fake-useragent>=1.4.0",
+    install_requires=parse_requirements("requirements.txt"),
     entry_points={
         "console_scripts": [
-            "SManga=SManga.core.cli:cli",
-            "smanga=SManga.core.cli:cli",
+            "smanga=SManga.core.cli:app",
         ],
     },
     classifiers=[
