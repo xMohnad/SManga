@@ -23,6 +23,7 @@ class ColorScheme:
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)  # Footer
         curses.init_pair(9, curses.COLOR_WHITE, curses.COLOR_BLUE) # 
 
+
     def get_color(self, color_id):
         """Get the color pair by ID."""
         return curses.color_pair(color_id)
@@ -180,30 +181,65 @@ class Menu:
         y_pos = 3 + (idx - self.offset) * 3
         box_width = width - 4
         color_pair = 3 if idx == self.current_row else 6  # Highlight current item
-
+    
         if y_pos + 2 >= height:
             return
-        
+    
         try:
-            
             # Clear the full line to avoid leftover characters
             stdscr.addstr(y_pos + 1, 2, " " * box_width)
     
             stdscr.attron(self.color_scheme.get_color(color_pair))
-            stdscr.addstr(y_pos, 2, f"╭{'─' * (box_width - 2)}╮")
-    
-            item = item.display(box_width - 5)
-            item = f"#{idx + 1} {item}" if idx == self.current_row else item
-    
-            truncated_item = item[:box_width - 5]
-            stdscr.addstr(y_pos + 1, 2, f"│ {truncated_item:<{box_width - 6}}")
-            stdscr.addstr(y_pos + 1, box_width + 1, "│")
-            
-            stdscr.addstr(y_pos + 2, 2, f"╰{'─' * (box_width - 2)}╯")
+            truncated_item = self._get_truncated_item(idx, item, box_width)
+
+            if self.search_mode and self.search_query:
+                self._render_search_highlight(stdscr, truncated_item, y_pos, box_width, color_pair)
+            else:
+                stdscr.addstr(y_pos + 1, 4, truncated_item)  # Not in search mode, render normally
+
+            self._render_box(stdscr, y_pos, box_width)
             stdscr.attroff(self.color_scheme.get_color(color_pair))
-        except (curses.error, ValueError): 
+    
+        except (curses.error, ValueError):
             pass
 
+    def _render_search_highlight(self, stdscr, truncated_item, y_pos, box_width, color_pair):
+        """Highlight the matching part of the item in search mode with underline."""
+        # Get the query in lowercase for case-insensitive matching
+        query = self.search_query.lower()
+        item_lower = truncated_item.lower()
+        start_idx = item_lower.find(query)
+    
+        if start_idx == -1:
+            return stdscr.addstr(y_pos + 1, 4, truncated_item)  # No match, render normally
+    
+        # Before match
+        stdscr.addstr(y_pos + 1, 4, truncated_item[:start_idx])
+    
+        # Match highlight with underline and bold
+        stdscr.attron(curses.A_UNDERLINE)  # Enable underline attribute
+        stdscr.attron(curses.A_BOLD)        # Enable bold attribute
+        stdscr.addstr(y_pos + 1, 4 + start_idx, truncated_item[start_idx:start_idx + len(query)])
+        stdscr.attroff(curses.A_BOLD)       # Disable bold attribute
+        stdscr.attroff(curses.A_UNDERLINE)  # Disable underline attribute
+
+        # Restore the original color for the text after the match
+        stdscr.attron(self.color_scheme.get_color(color_pair))
+        stdscr.addstr(y_pos + 1, 4 + start_idx + len(query), truncated_item[start_idx + len(query):])
+
+    def _render_box(self, stdscr, y_pos, box_width):
+        """Render the border of the item box."""
+        stdscr.addstr(y_pos, 2, f"╭{'─' * (box_width - 2)}╮")
+        stdscr.addstr(y_pos + 1, box_width + 1, "│")
+        stdscr.addstr(y_pos + 1, 2, "│")
+        stdscr.addstr(y_pos + 2, 2, f"╰{'─' * (box_width - 2)}╯")
+    
+    def _get_truncated_item(self, idx, item, box_width):
+        """Get the truncated item display string."""
+        item_display = item.display(box_width - 5)
+        item_name = f"#{idx + 1} {item_display}" if idx == self.current_row else item_display
+        return item_name[:box_width - 5]
+    
     def _render_search_bar(self, stdscr, width):
         """Render the search bar if in search mode."""
         if self.search_mode:
@@ -321,11 +357,11 @@ class MenuUI:
 
     def __init__(self, stdscr):
         self.stdscr = stdscr
+        self._init_curses()
         self.color_scheme = ColorScheme()
         self.color_scheme.setup_colors()
         self.sections = Sections(stdscr, self.color_scheme)
         self.menu = Menu(self.color_scheme)
-        self._init_curses()
 
     def display_menu(self):
         """Main loop to display the menu and handle user interactions."""
