@@ -49,13 +49,13 @@ class SManga:
     ) -> dict:
         """Prepares settings for the crawling process."""
         return Settings({
+            **get_project_settings(),
             "FEEDS": {
                 file_name: {
                     "format": file_format,
                     "overwrite": overwrite,
                 }
             },
-            **get_project_settings(),
             **({"USER_AGENT": user_agent} if user_agent else {})
         })
 
