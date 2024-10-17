@@ -13,71 +13,90 @@ SManga is a command-line tool for scraping manga chapters from various websites 
 
 2. Install the package:
     ```sh
-    pip install dist/SManga-x.x.tar.gz
+    pip install dist/SManga-*.tar.gz
     ```
     
     -   or `.whl`
     
     ```sh
-    pip install dist/SManga-x.x-py3-none-any.whl
+    pip install dist/SManga-*-py3-none-any.whl
     ```
 
-## Usage
+### **Commands Overview**  
 
-To use the `SManga` CLI, you can run the following commands:
-
+#### 1. **crawl**: Scrape manga chapters from a given link  
 ```bash
-smanga [OPTIONS] [LINK]
+smanga crawl <link> [OPTIONS]
 ```
 
-### Options
+- **Description:**  
+  Scrapes chapters from the provided link and saves the data in a JSON file.
+
+- **Parameters:**
+  - `link`: The link to scrape chapters from.
+  - `-f, --file`: The output file to save the data (default: `chapters.json`).
+  - `-u, --User-Agent`: A custom User-Agent to use during scraping.
+  - `-o, --overwrite`: Overwrite the existing file if it already exists.
+  - `-r, --recent`: Display the most recent saved chapters.
+  - `-s, --spider`: The spider to use (optional).
+
+- **Examples:**
+  ```bash
+  smanga crawl https://example-manga-site.com/manga-title/1 -f data.json -o -u "Custom-Agent"
+  ```
+
+---
+
+#### 2. **list**: List all available spiders  
 ```bash
-❯ SManga -h
-Usage: smanga [OPTIONS] [LINK]
-
-  SManga: A tool to scrape manga chapters from various sites.
-
-Options:
-  -h, --help                Show this message and exit.
-  -s, --spider TEXT         The name of the spider to use (optional).
-  -f, --file TEXT           File to save scraped data (with extension),
-                            default: `chapters.json`.
-  -o, --overwrite           Overwrite existing file if it exists.
-  -l, --list                List all available spiders.
-  -r, --recent              Display the most recent chapters saved from
-                            previous scrapes.
-  -a, --add <TEXT PATH>...  Add a manga for future crawling. Provide the
-                            spider name and JSON file path containing manga
-                            data. Example: -a my_spider data.json. This allows
-                            you to use the -r option later.
+smanga list
 ```
 
-### Examples
+- **Description:**  
+  Displays a list of all **available spiders** that can be used for scraping.
 
-#### Scraping a manga
+- **Examples:**
+  ```bash
+  smanga list
+  ```
 
-   ```bash
-   smanga https://example-manga-site.com/manga-title/1 -f filename.ext
-   ```
+---
 
-#### Listing available spiders
+#### 3. **add**: Add manga data for future scraping  
+```bash
+smanga add <json_file> <spider_name>
+```
 
-   ```bash
-   smanga --list
-   ```
+- **Description:**  
+  Adds manga data from a **JSON file** to be used later with the `-r` option in the `crawl` command.
 
-#### Viewing the most recent chapters
+- **Parameters:**
+  - `json_file`: The path to the JSON file containing manga data.
+  - `spider_name`: The name of the spider used for scraping the data.
 
-   ```bash
-   smanga --recent
-   ```
+- **Examples:**
+  ```bash
+  smanga add manga_data.json "example_spider"
+  ```
 
-#### Adding a manga for future crawling
+---
 
-   ```bash
-   smanga --add my_spider manga_data.json
-   ```
+
+### **To use the `SManga`**
+```bash
+smanga [COMMAND] [OPTIONS]
+```
+
+---
+
+### **Notes**  
+- Some websites may reject scraper requests, so using an appropriate **User-Agent** is recommended.  
+- Use the `--overwrite` option cautiously to avoid losing important data.
+
+---
 
 ## License
 
 SManga is open-source software licensed under the [MIT License](https://opensource.org/licenses/MIT). This means you can freely use, modify, and distribute the tool, provided you include the original license and copyright notice in any distributions or derivative works.
+
+
