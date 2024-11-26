@@ -94,7 +94,6 @@ class Menu:
         """Select the currently highlighted item."""
         if 0 <= self.current_row < len(self.filtered_items):
             selected_item = self.filtered_items[self.current_row]
-            curses.endwin()
             return selected_item
         else:
             return None
@@ -374,14 +373,17 @@ class MenuUI:
 
             if self.menu.handle_navigation(key, self.stdscr):
                 self._confirm_deletion()
+                self.stdscr.clear()
             elif key == ord("\n"):
                 selected = self.menu.select_item()
                 if selected:
                     return selected
             elif key == 263:  # Ctrl + H
                 self.sections.show_help()
+                self.stdscr.clear()
             elif key == 19:  # Ctrl + S
                 self.menu.toggle_sort()
+                self.stdscr.clear()
             elif key == 17:  # Ctrl + Q
                 break
 

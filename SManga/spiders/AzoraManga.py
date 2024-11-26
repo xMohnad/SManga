@@ -1,4 +1,6 @@
 from SManga.lib.themes.madara import Madara
+from scrapy.http import Response
+from typing import Optional
 
 
 class AzoramangaSpider(Madara):

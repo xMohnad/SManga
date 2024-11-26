@@ -5,4 +5,6 @@ class MangalekSpider(Madara):
     name = "MangaLek"
     base_url = "https://lekmanga.net/"
     language = "Ara"
-    manganame_selector = ".c-breadcrumb li:nth-child(2) > a::text"
+    selector_manganame = ".c-breadcrumb li:nth-child(2) > a::text"
+    home_selector = "ol.breadcrumb li:nth-child(2) > a::attr(href)"
+

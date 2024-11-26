@@ -1,38 +1,25 @@
 import scrapy
-from SManga.items import ChapterItem
 from scrapy.http import Response
 from scrapy.selector import Selector
 from typing import List, Optional, Generator
 
+from SManga.items import ChapterItem, MangaDetails, SMangaItem
+
 class BaseSpider(scrapy.Spider):
     """
-    BaseSpider is the foundation for manga scraping spiders. 
-    It contains the main logic for scraping manga details and chapters, 
+    BaseSpider is the foundation for manga scraping spiders.
+    It contains the main logic for scraping manga details and chapters,
     and provides abstract methods for child classes to implement specific behaviors.
 
     Attributes:
         name (str): The name of the spider (must be set in child classes).
         base_url (str): The base URL of the manga site (set in child classes).
+        language (str): The language the manga site (set in child classes).
     """
+
     name: str = ""
     base_url: str = ""
     language: str = ""
-
-    manganame: Optional[str] = None
-    """
-    The name of the manga (to be extracted).
-    """
-    cover: Optional[str] = None
-    """
-    The cover image URL of the manga (to be extracted).
-    """
-    
-    extract_details_from_current_page: bool = True
-    """
-    Whether to extract details from the first scraped page (chapter page).
-
-    if details not exist in chapter page set it to False.
-    """
 
     scraped_details: bool = True
     """
@@ -49,7 +36,7 @@ class BaseSpider(scrapy.Spider):
 
     def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
         """
-        Handles the parsing logic for scraping the manga. If the manga details 
+        Handles the parsing logic for scraping the manga. If the manga details
         are not yet scraped, it extracts them first. Otherwise, it scrapes the chapter data.
 
         Args:
@@ -59,38 +46,21 @@ class BaseSpider(scrapy.Spider):
             Request: The next request for the following page.
         """
         if self.scraped_details:
-            home_url = self.handle_initial_scraping(response)
+            self.scraped_details = False
+            home_url = self.extract_home_url(response)
             if home_url:
                 yield self.retry_scraping_with_home_url(response, home_url)
                 return
 
-        yield self.create_chapter_item(response)
+        yield self.create_smanga_item(response)
 
         next_page = self.extract_next_page_url(response)
         if next_page and next_page.startswith("http"):
             yield response.follow(url=next_page.strip(), callback=self.parse)
 
-    def handle_initial_scraping(self, response: Response) -> Optional[str]:
-        """
-        Handles the initial scraping of manga details (name and cover).
-        If these details are not found on the current page, it triggers
-        a retry using the home page URL.
-
-        Args:
-            response (Response): The response object for the current page.
-
-        Returns:
-            Optional[str]: The home URL if the details need to be retried from the homepage.
-        """
-        self.scraped_details = False
-        if self.extract_details_from_current_page:
-            self.extract_manga_details(response)
-
-        if not self.manganame or not self.cover:
-            return self.extract_home_url(response)
-        return None
-
-    def retry_scraping_with_home_url(self, response: Response, home_url: str) -> scrapy.Request:
+    def retry_scraping_with_home_url(
+        self, response: Response, home_url: str
+    ) -> scrapy.Request:
         """
         Generates a retry request using the home URL to scrape manga details.
 
@@ -108,6 +78,23 @@ class BaseSpider(scrapy.Spider):
             dont_filter=True,
         )
 
+    def create_smanga_item(self, response: Response) -> SMangaItem:
+        """
+        Creates a SMangaItem object from the scraped.
+
+        Args:
+            response (Response): The response object containing the chapter's page content.
+
+        Returns:
+            SMangaItem: The populated SMangaItem object with chapter item and details item.
+        """
+        item = SMangaItem()
+        details_item = response.meta.get("details_item")
+        if details_item:
+            item["details"] = details_item
+        item["chapters"] = self.create_chapter_item(response)
+        return item
+
     def create_chapter_item(self, response: Response) -> ChapterItem:
         """
         Creates a ChapterItem object from the scraped data of the current chapter.
@@ -116,19 +103,19 @@ class BaseSpider(scrapy.Spider):
             response (Response): The response object containing the chapter's page content.
 
         Returns:
-            ChapterItem: The populated ChapterItem object with chapter details.
+            ChapterItem: The populated ChapterItem object with chapter data.
         """
         item = ChapterItem()
-        item["manganame"] = f"{self.manganame} ({self.name})"
-        item["cover"] = self.cover
         item["title"] = self.extract_title(response)
         item["images"] = self.parse_chapter_image(response)
         item["document_location"] = response.url
         return item
 
-    def get_details_and_retry(self, response: Response) -> Generator[scrapy.Request, None, None]:
+    def get_details_and_retry(
+        self, response: Response
+    ) -> Generator[scrapy.Request, None, None]:
         """
-        Extracts the manga details (name and cover) from the home page and retries scraping 
+        Extracts the manga details (name and cover) from the home page and retries scraping
         the original page.
 
         Args:
@@ -137,22 +124,30 @@ class BaseSpider(scrapy.Spider):
         Yields:
             Request: The retry request for the original page.
         """
-        self.manganame = self.extract_manga_name_from_home(response)
-        self.cover = self.extract_cover_from_home(response)
+        item = MangaDetails()
+
+        item["source"] = self.name
+        item["manganame"] = self.extract_manga_name(response)
+        item["cover"] = self.extract_cover(response)
+        item["description"] = self.extract_description(response)
+        item["genre"] = self.extract_genre(response)
+        item["author"] = self.extract_author(response)
+        item["artist"] = self.extract_artist(response)
+
         retry_url = response.meta.get("retry")
         if retry_url:
-            yield response.follow(url=retry_url, callback=self.parse, dont_filter=True)
-    
-    # Abstract Methods to be Implemented by Child Classes
+            yield response.follow(
+                url=retry_url,
+                callback=self.parse,
+                meta={"details_item": item},
+                dont_filter=True,
+            )
 
-    def extract_manga_details(self, response: Response) -> None:
-        """
-        Abstract method for extracting manga details (name, cover) from the current page.
-        Must be implemented by the child class.
-        """
-        raise NotImplementedError("This method should be overridden in the child class")
+    ## Abstract Methods to be Implemented by Child Classes
 
-    def extract_manga_name_from_home(self, response: Response) -> Optional[str]:
+    # details data
+
+    def extract_manga_name(self, response: Response) -> Optional[str]:
         """
         Abstract method for extracting the manga's name from the home page.
         Must be implemented by the child class.
@@ -162,7 +157,7 @@ class BaseSpider(scrapy.Spider):
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
-    def extract_cover_from_home(self, response: Response) -> Optional[str]:
+    def extract_cover(self, response: Response) -> Optional[str]:
         """
         Abstract method for extracting the manga's cover image from the home page.
         Must be implemented by the child class.
@@ -171,6 +166,48 @@ class BaseSpider(scrapy.Spider):
             Optional[str]: The URL of the manga's cover image.
         """
         raise NotImplementedError("This method should be overridden in the child class")
+
+    def extract_description(self, response: Response) -> Optional[str]:
+        """
+        Abstract method for extracting the manga's description from the home page.
+        Must be implemented by the child class.
+
+        Returns:
+            Optional[str]: The description of the manga's.
+        """
+        raise NotImplementedError("This method should be overridden in the child class")
+
+    def extract_genre(self, response: Response) -> List[str]:
+        """
+        Abstract method for extracting the manga's genre from the home page.
+        Must be implemented by the child class.
+
+        Returns:
+            List[str] The genre of the manga's.
+        """
+        raise NotImplementedError("This method should be overridden in the child class")
+
+    def extract_author(self, response: Response) -> str:
+        """
+        Abstract method for extracting the manga's author from the home page.
+        Must be implemented by the child class.
+
+        Returns:
+            str: The name of the manga's author.
+        """
+        raise NotImplementedError("This method should be overridden in the child class")
+
+    def extract_artist(self, response: Response) -> str:
+        """
+        Abstract method for extracting the manga's artist from the home page.
+        Must be implemented by the child class.
+
+        Returns:
+            str: The name of the manga's artist.
+        """
+        raise NotImplementedError("This method should be overridden in the child class")
+
+    # URLs
 
     def extract_home_url(self, response: Response) -> Optional[str]:
         """
@@ -191,6 +228,8 @@ class BaseSpider(scrapy.Spider):
             Optional[str]: The URL of the next chapter page.
         """
         raise NotImplementedError("This method should be overridden in the child class")
+
+    # chapter data
 
     def parse_chapter_image(self, response: Response) -> List[str]:
         """
@@ -214,18 +253,27 @@ class BaseSpider(scrapy.Spider):
 
     # Utility method for extracting image URLs from HTML elements
     def image_from_element(self, element: Selector) -> str:
-        """
-        Extracts the image URL from an HTML element using multiple possible attributes.
-
-        Args:
-            element (Selector): The HTML element containing the image.
-
-        Returns:
-            str: The extracted image URL.
-        """
+        """Extracts the image URL from an HTML element using multiple possible attributes."""
         for attr in ["data-lazy-src", "data-src", "srcset", "data-cfsrc", "src"]:
             if element.attrib.get(attr):
                 if attr == "srcset":
                     return element.attrib["srcset"].split(" ")[0]
                 return element.attrib.get(attr)
         return ""
+
+    # def text_from_element(self, element):
+
+    def clean_text(self, text: Selector, include_all: bool=False, separator: str | None = "\n"):
+        """Cleans the provided text."""
+        # Check if text is None or contains invalid values
+        if not text or all(item.strip() in ["-", "N/A", "n/a"] for item in text.getall()):
+            return None
+        
+        # Return concatenated string if include_all is True
+        if include_all:
+            if separator:
+                return separator.join(item.strip() for item in text.xpath('string()').getall()).strip()
+            return [item.strip() for item in text.xpath('string()').getall()]
+
+        # Return single cleaned string
+        return text.xpath('string()').get().strip()

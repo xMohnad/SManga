@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+
 def parse_requirements(filename):
     with open(filename, "r", encoding="utf8") as f:
         requirements = f.read().strip().split("\n")
@@ -8,9 +9,10 @@ def parse_requirements(filename):
         ]
         return requirements
 
+
 setup(
     name="SManga",
-    version="0.3.2",
+    version="0.4.2",
     description="A CLI tool for scraping manga chapters using Scrapy",
     packages=find_packages(),
     install_requires=parse_requirements("requirements.txt"),

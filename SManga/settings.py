@@ -12,6 +12,9 @@ BOT_NAME = "SManga"
 SPIDER_MODULES = ["SManga.spiders"]
 NEWSPIDER_MODULE = "SManga.spiders"
 
+ITEM_PIPELINES = {
+    'SManga.pipelines.CustomJsonFeed': 300,
+}
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 # USER_AGENT = None

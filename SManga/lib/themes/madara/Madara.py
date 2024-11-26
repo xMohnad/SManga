@@ -7,28 +7,30 @@ from typing import List, Optional
 from SManga.lib.cryptoaes import CryptoAES
 from SManga.lib.themes import BaseSpider
 
-
 class Madara(BaseSpider):
     name = ""
     base_url = ""
     language: str = ""
 
-    manganame = None
-    cover = None
-    extract_details_from_script = False
-
     next_page_selector = ".select-pagination .nav-next a:not(.back)::attr(href)"
-    home_selector = "#chapter-heading > a.back::attr(href)"
+    home_selector = "#chapter-heading > a.back::attr(href), ol.breadcrumb li:nth-child(3) > a::attr(href)"
     title_selector = ".c-breadcrumb .active::text"
 
     chapter_selector = "div.page-break img, li.blocks-gallery-item img, .reading-content .text-left:not(:has(.blocks-gallery-item)) img"
     chapter_protector_selector = "#chapter-protector-data"
 
-    manganame_xpath = '//li[@class="active"]/preceding-sibling::li[1]/a/text()'
-    cover_selector = "head > meta[property^='og:image']::attr(content)"
-
-    home_manganame_selector = ".tab-summary .post-title > h1::text"
-    home_cover_selector = ".tab-summary .summary_image > a > img"
+    # Manga Details Selector
+    selector_manganame = "div.post-title h3, div.post-title h1, #manga-title > h1"
+    selector_cover = "div.summary_image img"
+    selector_genre = "div.genres-content a::text" 
+    selector_tag = "div.tags-content::text" 
+    selector_author = "div.author-content > a::text"
+    selector_artist = "div.artist-content > a::text" 
+    selector_description = (
+        "div.description-summary div.summary__content, "
+        "div.summary_content div.post-content_item > h5 + div, "
+        "div.summary_content div.manga-excerpt, div.manga-summary"
+    ) 
 
     def extract_next_page_url(self, response: Response) -> Optional[str]:
         return response.css(self.next_page_selector).get(default="").strip()
@@ -87,46 +89,32 @@ class Madara(BaseSpider):
 
     # Extract manga details
 
-    def extract_manga_name_from_home(self, response: Response):
-        manga_name = response.css(self.home_manganame_selector).get()
-        return manga_name.strip() if manga_name else None
-
-    def extract_cover_from_home(self, response: Response) -> Optional[str]:
-        return self.image_from_element(response.css(self.home_cover_selector))
-
-    # extract details from current page
-
-    def extract_manga_details(self, response: Response):
-        if self.extract_details_from_script:
-            self.extract_details_in_script(response)
-        else:
-            self.manganame = self.extract_manga_name(response)
-            self.cover = self.extract_cover(response)
-
     def extract_manga_name(self, response: Response):
-        return response.xpath(self.manganame_xpath).get().strip()
+        return response.css(self.selector_manganame).xpath('.//text()').get(default='UnknownManga').strip() 
 
     def extract_cover(self, response: Response):
-        return response.css(self.cover_selector).get()
+        return self.image_from_element(response.css(self.selector_cover))
 
-    def extract_details_in_script(self, response: Response):
-        json_ld_data = self.get_json_ld_data(response)
-        if json_ld_data:
-            self.parse_json_ld_data(json_ld_data)
+    def extract_description(self, response: Response) -> Optional[str]:
+        element = response.css(self.selector_description)
+        if element.css("p::text").getall():
+            description = "\n\n".join(
+                p.get().replace("<br>", "\n").strip() for p in element.css("p::text")
+            )
+        else:
+            description = element.xpath('.//text()').get(default='').strip()
 
-    def get_json_ld_data(self, response: Response):
-        return response.xpath('//script[@type="application/ld+json"]/text()').get()
+        return description if description else None 
 
-    def parse_json_ld_data(self, json_ld_data: str):
-        try:
-            data = json.loads(json_ld_data)
-            self.manganame = self.get_manganame_in_json_ld(data)
-            self.cover = self.get_cover_in_json_ld(data)
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to decode JSON-LD: {e}")
+    def extract_genre(self, response: Response) -> List[str]:
+        genres = [*response.css(self.selector_genre).getall(), 
+                response.css(self.selector_tag).get()]
+        return [genre.strip() for genre in genres if genre.strip()]
 
-    def get_cover_in_json_ld(self, data):
-        return data.get("image", {}).get("url", self.cover)
+    def extract_author(self, response: Response) -> str:
+        author  = response.css(self.selector_author).get()
+        return author.strip() if author else None
 
-    def get_manganame_in_json_ld(self, data):
-        return data.get("headline", self.manganame)
+    def extract_artist(self, response: Response) -> str:
+        artist = response.css(self.selector_artist).get()
+        return artist.strip() if artist else None  
