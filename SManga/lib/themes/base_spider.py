@@ -1,9 +1,11 @@
+from typing import Generator, List, Optional, Union
+
 import scrapy
-from scrapy.http import Response
-from scrapy.selector import Selector
-from typing import List, Optional, Generator
+from scrapy.http.response import Response
+from scrapy.selector.unified import Selector, SelectorList
 
 from SManga.items import ChapterItem, MangaDetails, SMangaItem
+
 
 class BaseSpider(scrapy.Spider):
     """
@@ -14,7 +16,7 @@ class BaseSpider(scrapy.Spider):
     Attributes:
         name (str): The name of the spider (must be set in child classes).
         base_url (str): The base URL of the manga site (set in child classes).
-        language (str): The language the manga site (set in child classes).
+        language (str): The language of the manga site (set in child classes).
     """
 
     name: str = ""
@@ -32,9 +34,11 @@ class BaseSpider(scrapy.Spider):
         Starts the scraping process by making an initial request to the spider's URL.
         This can be overridden to handle multiple starting points if necessary.
         """
-        yield scrapy.Request(self.url, dont_filter=True)
+        yield scrapy.Request(self.url, dont_filter=True)  # pyright: ignore
 
-    def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
+    def parse(
+        self, response: Response
+    ) -> Generator[scrapy.Request | SMangaItem, None, None]:
         """
         Handles the parsing logic for scraping the manga. If the manga details
         are not yet scraped, it extracts them first. Otherwise, it scrapes the chapter data.
@@ -80,7 +84,7 @@ class BaseSpider(scrapy.Spider):
 
     def create_smanga_item(self, response: Response) -> SMangaItem:
         """
-        Creates a SMangaItem object from the scraped.
+        Creates a SMangaItem object from the scraped data.
 
         Args:
             response (Response): The response object containing the chapter's page content.
@@ -145,7 +149,7 @@ class BaseSpider(scrapy.Spider):
 
     ## Abstract Methods to be Implemented by Child Classes
 
-    # details data
+    # Details Data
 
     def extract_manga_name(self, response: Response) -> Optional[str]:
         """
@@ -173,7 +177,7 @@ class BaseSpider(scrapy.Spider):
         Must be implemented by the child class.
 
         Returns:
-            Optional[str]: The description of the manga's.
+            Optional[str]: The description of the manga.
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
@@ -183,27 +187,27 @@ class BaseSpider(scrapy.Spider):
         Must be implemented by the child class.
 
         Returns:
-            List[str] The genre of the manga's.
+            List[str]: The genres of the manga.
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
-    def extract_author(self, response: Response) -> str:
+    def extract_author(self, response: Response) -> Optional[str]:
         """
         Abstract method for extracting the manga's author from the home page.
         Must be implemented by the child class.
 
         Returns:
-            str: The name of the manga's author.
+            Optional[str]: The name of the manga's author.
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
-    def extract_artist(self, response: Response) -> str:
+    def extract_artist(self, response: Response) -> Optional[str]:
         """
         Abstract method for extracting the manga's artist from the home page.
         Must be implemented by the child class.
 
         Returns:
-            str: The name of the manga's artist.
+            Optional[str]: The name of the manga's artist.
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
@@ -215,7 +219,7 @@ class BaseSpider(scrapy.Spider):
         Must be implemented by the child class.
 
         Returns:
-            str: The URL of the manga's home page.
+            Optional[str]: The URL of the manga's home page.
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
@@ -229,7 +233,7 @@ class BaseSpider(scrapy.Spider):
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
-    # chapter data
+    # Chapter Data
 
     def parse_chapter_image(self, response: Response) -> List[str]:
         """
@@ -241,39 +245,84 @@ class BaseSpider(scrapy.Spider):
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
-    def extract_title(self, response: Response) -> str:
+    def extract_title(self, response: Response) -> Optional[str]:
         """
         Abstract method for extracting the chapter's title from the page.
         Must be implemented by the child class.
 
         Returns:
-            str: The chapter title.
+            Optional[str]: The chapter title.
         """
         raise NotImplementedError("This method should be overridden in the child class")
 
-    # Utility method for extracting image URLs from HTML elements
-    def image_from_element(self, element: Selector) -> str:
-        """Extracts the image URL from an HTML element using multiple possible attributes."""
-        for attr in ["data-lazy-src", "data-src", "srcset", "data-cfsrc", "src"]:
-            if element.attrib.get(attr):
-                if attr == "srcset":
-                    return element.attrib["srcset"].split(" ")[0]
-                return element.attrib.get(attr)
-        return ""
+    # Utility Methods
 
-    # def text_from_element(self, element):
+    def image_from_element(
+        self, element: Optional[Union[Selector, SelectorList]]
+    ) -> Optional[str]:
+        """
+        Extracts the image URL from an HTML element using multiple possible attributes.
 
-    def clean_text(self, text: Selector, include_all: bool=False, separator: str | None = "\n"):
-        """Cleans the provided text."""
-        # Check if text is None or contains invalid values
-        if not text or all(item.strip() in ["-", "N/A", "n/a"] for item in text.getall()):
+        Args:
+            element (Optional[Union[Selector, SelectorList]]): The Scrapy Selector object representing the HTML element.
+
+        Returns:
+            Optional[str]: The extracted image URL, or None if no valid URL is found.
+        """
+        if not element:
             return None
-        
-        # Return concatenated string if include_all is True
+
+        # Ordered list of attributes to check for the image URL
+        attributes = ["data-lazy-src", "data-src", "srcset", "data-cfsrc", "src"]
+
+        for attr in attributes:
+            value = element.attrib.get(attr)
+            if value:
+                # Handle 'srcset' attribute separately (e.g., "image.jpg 2x")
+                if attr == "srcset":
+                    return value.split(" ")[0]  # Return the first URL in the srcset
+                return value
+
+        return None
+
+    def clean_text(
+        self,
+        text: Optional[Union[Selector, List[Selector]]],
+        include_all: bool = False,
+        separator: Optional[str] = "\n",
+    ) -> Optional[Union[str, List[str]]]:
+        """
+        Cleans the provided text.
+
+        Args:
+            text (Optional[Union[Selector, list[Selector]]]): The Scrapy Selector or list of Selectors.
+            include_all (bool): Return all text items if True.
+            separator (Optional[str]): Separator for joining text items.
+
+        Returns:
+            Optional[Union[str, List[str]]]: Cleaned text or list of texts.
+        """
+        if text is None:
+            return None
+
+        # Normalize to a list for consistent processing
+        if isinstance(text, Selector):
+            text = [text]  # Wrap a single Selector in a list
+
+        # Check if all elements are empty or contain invalid values
+        if all((item.get() or "").strip() in ["-", "N/A", "n/a"] for item in text):
+            return None
+
         if include_all:
             if separator:
-                return separator.join(item.strip() for item in text.xpath('string()').getall()).strip()
-            return [item.strip() for item in text.xpath('string()').getall()]
+                return separator.join(
+                    (item.xpath("string()").get() or "").strip() for item in text
+                ).strip()
+            return [
+                (item.xpath("string()").get() or "").strip()
+                for item in text
+                if item.xpath("string()").get() is not None
+            ]
 
-        # Return single cleaned string
-        return text.xpath('string()').get().strip()
+        cleaned_text = text[0].xpath("string()").get()
+        return cleaned_text.strip() if cleaned_text else None
