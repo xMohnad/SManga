@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from scrapy.http import Response
+from scrapy.http.response import Response
 
 from SManga.lib.themes import BaseSpider
 
@@ -32,7 +32,7 @@ class TeamxSpider(BaseSpider):
 
     def parse_chapter_image(self, response: Response):
         image = response.css("div.page-break img")
-        return [self.image_from_element(img).strip() for img in image] if image else []
+        return [self.image_from_element(img).strip() for img in image] if image else []  # pyright: ignore
 
     # details data
 
@@ -53,9 +53,9 @@ class TeamxSpider(BaseSpider):
         genres = response.css("div.review-author-info a.subtitle::text").getall()
         return [genre.strip() for genre in genres if genre.strip()]
 
-    def extract_author(self, response: Response) -> str:
+    def extract_author(self, response: Response) -> str | None:
         author = response.css("div:nth-child(10) small:nth-child(2) a::text").get()
         return author.strip() if author else None
 
-    def extract_artist(self, response: Response) -> str:
+    def extract_artist(self, _: Response) -> None:
         return None
