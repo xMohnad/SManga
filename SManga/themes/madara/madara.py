@@ -6,7 +6,7 @@ from typing import List, Optional
 from scrapy.http.response import Response
 
 from SManga.lib.cryptoaes import CryptoAES
-from SManga.lib.themes import BaseSpider
+from SManga.themes import BaseSpider
 
 
 class Madara(BaseSpider):

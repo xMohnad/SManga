@@ -1,4 +1,4 @@
-from SManga.lib.themes.mangathemesia import MangaThemesiaSpider
+from SManga.themes.mangathemesia import MangaThemesiaSpider
 
 
 class MangaswetSpider(MangaThemesiaSpider):

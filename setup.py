@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 
 def parse_requirements(filename):
@@ -18,7 +18,7 @@ setup(
     install_requires=parse_requirements("requirements.txt"),
     entry_points={
         "console_scripts": [
-            "smanga=SManga.core.cli:app",
+            "smanga=SManga.cli.main:app",
         ],
     },
     classifiers=[

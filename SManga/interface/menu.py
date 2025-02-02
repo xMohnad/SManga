@@ -1,11 +1,14 @@
 import curses
-from SManga.core.components.manga_processor import SpiderDataProcessor
-from SManga.core.interface.sections import Sections
-from SManga.core.interface.menu_item import MenuItem
+
+from SManga.core import SpiderDataProcessor
+
+from .menu_item import MenuItem
+from .sections import Sections
+
 
 class ColorScheme:
     """Class to define and manage color schemes."""
-    
+
     def __init__(self):
         self.colors = {}
 
@@ -21,8 +24,7 @@ class ColorScheme:
         curses.init_pair(6, curses.COLOR_CYAN, curses.COLOR_BLACK)  # Search
         curses.init_pair(7, curses.COLOR_MAGENTA, curses.COLOR_BLACK)  # Sorting
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)  # Footer
-        curses.init_pair(9, curses.COLOR_WHITE, curses.COLOR_BLUE) # 
-
+        curses.init_pair(9, curses.COLOR_WHITE, curses.COLOR_BLUE)  #
 
     def get_color(self, color_id):
         """Get the color pair by ID."""
@@ -82,7 +84,7 @@ class Menu:
             next_key = stdscr.getch()
             if next_key == ord("q"):
                 self._cancel_search_mode()
-                stdscr.clear() 
+                stdscr.clear()
         elif key in [127, curses.KEY_BACKSPACE]:
             self._delete_search_char()
             stdscr.clear()
@@ -139,10 +141,15 @@ class Menu:
 
         try:
             stdscr.attron(self.color_scheme.get_color(3))
-            stdscr.addstr(height - 1, 0, final_footer_text.ljust(available_width), self.color_scheme.get_color(3))
+            stdscr.addstr(
+                height - 1,
+                0,
+                final_footer_text.ljust(available_width),
+                self.color_scheme.get_color(3),
+            )
             stdscr.attroff(self.color_scheme.get_color(3))
         except curses.error:
-            pass  
+            pass
 
     def _render_items(self, stdscr, height, width):
         """Render the menu items with navigation and ensure visibility of the current row."""
@@ -155,76 +162,92 @@ class Menu:
                 self.color_scheme.get_color(3),
             )
             return
-    
+
         # Ensure current row stays within bounds of the filtered list
         self.current_row = min(self.current_row, len(self.filtered_items) - 1)
-    
+
         # Adjust the offset to ensure the current row is visible
         if self.current_row < self.offset:
             self.offset = self.current_row
         elif self.current_row >= self.offset + max_items:
             self.offset = self.current_row - max_items + 1
-    
+
         # Calculate the visible range of items to be displayed on screen
-        visible_range = range(self.offset, min(self.offset + max_items, len(self.filtered_items)))
-    
+        visible_range = range(
+            self.offset, min(self.offset + max_items, len(self.filtered_items))
+        )
+
         # Render each visible item box in the computed range
         for idx in visible_range:
             self._render_item_box(stdscr, idx, height, width)
-    
+
         stdscr.refresh()
-        
+
     def _render_item_box(self, stdscr, idx, height, width):
         """Render a single item box with proper alignment for borders."""
         item = self.filtered_items[idx]
         y_pos = 3 + (idx - self.offset) * 3
         box_width = width - 4
         color_pair = 3 if idx == self.current_row else 6  # Highlight current item
-    
+
         if y_pos + 2 >= height:
             return
-    
+
         try:
             # Clear the full line to avoid leftover characters
             stdscr.addstr(y_pos + 1, 2, " " * box_width)
-    
+
             stdscr.attron(self.color_scheme.get_color(color_pair))
             truncated_item = self._get_truncated_item(idx, item, box_width)
 
             if self.search_mode and self.search_query:
-                self._render_search_highlight(stdscr, truncated_item, y_pos, box_width, color_pair)
+                self._render_search_highlight(
+                    stdscr, truncated_item, y_pos, box_width, color_pair
+                )
             else:
-                stdscr.addstr(y_pos + 1, 4, truncated_item)  # Not in search mode, render normally
+                stdscr.addstr(
+                    y_pos + 1, 4, truncated_item
+                )  # Not in search mode, render normally
 
             self._render_box(stdscr, y_pos, box_width)
             stdscr.attroff(self.color_scheme.get_color(color_pair))
-    
+
         except (curses.error, ValueError):
             pass
 
-    def _render_search_highlight(self, stdscr, truncated_item, y_pos, box_width, color_pair):
+    def _render_search_highlight(
+        self, stdscr, truncated_item, y_pos, box_width, color_pair
+    ):
         """Highlight the matching part of the item in search mode with underline."""
         # Get the query in lowercase for case-insensitive matching
         query = self.search_query.lower()
         item_lower = truncated_item.lower()
         start_idx = item_lower.find(query)
-    
+
         if start_idx == -1:
-            return stdscr.addstr(y_pos + 1, 4, truncated_item)  # No match, render normally
-    
+            return stdscr.addstr(
+                y_pos + 1, 4, truncated_item
+            )  # No match, render normally
+
         # Before match
         stdscr.addstr(y_pos + 1, 4, truncated_item[:start_idx])
-    
+
         # Match highlight with underline and bold
         stdscr.attron(curses.A_UNDERLINE)  # Enable underline attribute
-        stdscr.attron(curses.A_BOLD)        # Enable bold attribute
-        stdscr.addstr(y_pos + 1, 4 + start_idx, truncated_item[start_idx:start_idx + len(query)])
-        stdscr.attroff(curses.A_BOLD)       # Disable bold attribute
+        stdscr.attron(curses.A_BOLD)  # Enable bold attribute
+        stdscr.addstr(
+            y_pos + 1, 4 + start_idx, truncated_item[start_idx : start_idx + len(query)]
+        )
+        stdscr.attroff(curses.A_BOLD)  # Disable bold attribute
         stdscr.attroff(curses.A_UNDERLINE)  # Disable underline attribute
 
         # Restore the original color for the text after the match
         stdscr.attron(self.color_scheme.get_color(color_pair))
-        stdscr.addstr(y_pos + 1, 4 + start_idx + len(query), truncated_item[start_idx + len(query):])
+        stdscr.addstr(
+            y_pos + 1,
+            4 + start_idx + len(query),
+            truncated_item[start_idx + len(query) :],
+        )
 
     def _render_box(self, stdscr, y_pos, box_width):
         """Render the border of the item box."""
@@ -232,36 +255,45 @@ class Menu:
         stdscr.addstr(y_pos + 1, box_width + 1, "│")
         stdscr.addstr(y_pos + 1, 2, "│")
         stdscr.addstr(y_pos + 2, 2, f"╰{'─' * (box_width - 2)}╯")
-    
+
     def _get_truncated_item(self, idx, item, box_width):
         """Get the truncated item display string."""
         item_display = item.display(box_width - 5)
-        item_name = f"#{idx + 1} {item_display}" if idx == self.current_row else item_display
-        return item_name[:box_width - 5]
-    
+        item_name = (
+            f"#{idx + 1} {item_display}" if idx == self.current_row else item_display
+        )
+        return item_name[: box_width - 5]
+
     def _render_search_bar(self, stdscr, width):
         """Render the search bar if in search mode."""
         if self.search_mode:
             title = "Filter: "
             query = self.search_query
 
-            max_query_length = width - len(title) - 6  
+            max_query_length = width - len(title) - 6
             if len(query) > max_query_length:
-                query = query[:max_query_length - 3] + "..."
-    
+                query = query[: max_query_length - 3] + "..."
+
             # Render the title of the search bar
             stdscr.attron(curses.A_BOLD)
             stdscr.addstr(1, 3, title, self.color_scheme.get_color(6))
             stdscr.addstr(1, len(title) + 3, query, self.color_scheme.get_color(6))
-    
+
             # Clear the remaining space in the search bar
             remaining_space = width - len(title) - len(query) - 4
             if remaining_space > 0:
-                stdscr.addstr(1, len(title) + len(query) + 3, " " * remaining_space, self.color_scheme.get_color(4))
+                stdscr.addstr(
+                    1,
+                    len(title) + len(query) + 3,
+                    " " * remaining_space,
+                    self.color_scheme.get_color(4),
+                )
 
             # Display a blinking cursor (indicator)
             cursor_position = len(title) + len(query) + 3
-            stdscr.addstr(1, cursor_position, " ", self.color_scheme.get_color(9) | curses.A_BOLD)
+            stdscr.addstr(
+                1, cursor_position, " ", self.color_scheme.get_color(9) | curses.A_BOLD
+            )
             stdscr.attroff(curses.A_BOLD)
 
     # Private methods for handling search
@@ -398,16 +430,19 @@ class MenuUI:
         curses.curs_set(0)
         self.stdscr.timeout(100)
 
+
 if __name__ == "__main__":
+
     def UI(stdscr):
         """Main entry point."""
         ui = MenuUI(stdscr)
         return ui.display_menu()
+
     try:
         item = curses.wrapper(UI)
         if item:
             import json
+
             print(json.dumps(item.__dict__, indent=4, ensure_ascii=False))
     except Exception as e:
         print(e)
-        

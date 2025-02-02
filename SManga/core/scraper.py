@@ -1,12 +1,13 @@
 from pathlib import Path
 from typing import Optional
-from scrapy.crawler import CrawlerProcess
-from scrapy.utils.project import get_project_settings
-from scrapy.spiderloader import SpiderLoader
-from scrapy.settings import Settings
-from rich import print
 
-from SManga.core.components import SpiderDataProcessor
+from rich import print
+from scrapy.crawler import CrawlerProcess
+from scrapy.settings import Settings
+from scrapy.spiderloader import SpiderLoader
+from scrapy.utils.project import get_project_settings
+
+from SManga.core import SpiderDataProcessor
 
 # Constants
 SUPPORTED_FORMATS = ["json", "jsonlines", "jl", "xml", "pickle", "marshal"]
@@ -40,9 +41,7 @@ class SManga:
     # Validation Methods
     def _validate_file_format(self, file_name: Optional[Path]) -> str:
         """Validates the file format based on the extension."""
-        file_format = (
-            str(file_name).rsplit(".", 1)[-1].lower() if file_name else "json"
-        )
+        file_format = str(file_name).rsplit(".", 1)[-1].lower() if file_name else "json"
         if file_format not in SUPPORTED_FORMATS:
             raise TypeError(
                 f"Unsupported file format: {file_format}. "
@@ -58,14 +57,14 @@ class SManga:
         """Validates the spider name and URL."""
         if not self.url:
             raise ValueError("Error: Missing argument 'URL'.")
-    
+
         spider_name = spider_name or self.find_spider_by_base_url()
         if not spider_name:
             raise ValueError("The site is not yet supported.")
-    
+
         if spider_name not in self.list_spiders:
             raise ValueError(f"Spider with name '{spider_name}' not found.")
-    
+
         return spider_name
 
     # Settings Preparation
@@ -128,12 +127,12 @@ class SManga:
     def start(self, spider_name: Optional[str] = None) -> None:
         """Starts the crawling process using the appropriate spider."""
         spider_name = self._validate_spider(spider_name)
-        
+
         # Initialize the processor and start the crawling process
         self.processor = SpiderDataProcessor(spider_name)
         self.spider_name = spider_name
         process = CrawlerProcess(self.process_settings)
-    
+
         process.crawl(spider_name, url=self.url, smanga=self)
         process.start()
 

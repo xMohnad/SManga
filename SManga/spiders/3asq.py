@@ -1,4 +1,4 @@
-from SManga.lib.themes.madara import Madara
+from SManga.themes.madara import Madara
 
 
 class Al3asqSpider(Madara):

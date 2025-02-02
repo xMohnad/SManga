@@ -6,7 +6,7 @@ from scrapy import Request
 from scrapy.http.response import Response
 
 from SManga.items import MangaDetails
-from SManga.lib.themes import BaseSpider
+from SManga.themes import BaseSpider
 
 
 class MangaThemesiaSpider(BaseSpider):

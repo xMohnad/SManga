@@ -1,4 +1,4 @@
-from SManga.core.components.manga_processor import SpiderDataProcessor
+from SManga.core import SpiderDataProcessor
 
 
 class MenuItem:

@@ -1,4 +1,4 @@
-from SManga.lib.themes.madara import Madara
+from SManga.themes.madara import Madara
 
 
 class MangalekSpider(Madara):
@@ -7,4 +7,3 @@ class MangalekSpider(Madara):
     language = "Ara"
     selector_manganame = ".c-breadcrumb li:nth-child(2) > a::text"
     home_selector = "ol.breadcrumb li:nth-child(2) > a::attr(href)"
-

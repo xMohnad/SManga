@@ -1,6 +1,5 @@
 import curses
 
-
 # curses.start_color()
 # curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
 # curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)
@@ -9,8 +8,9 @@ import curses
 # curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
 # curses.init_pair(6, curses.COLOR_GREEN, curses.COLOR_BLACK)
 # curses.init_pair(7, curses.COLOR_CYAN, curses.COLOR_BLACK)
-# curses.init_pair(8, curses.COLOR_YELLOW, curses.COLOR_BLACK) # 
- 
+# curses.init_pair(8, curses.COLOR_YELLOW, curses.COLOR_BLACK) #
+
+
 class Sections:
     def __init__(self, stdscr, color_scheme):
         self.stdscr = stdscr
@@ -38,7 +38,9 @@ class Sections:
         )
         stdscr.refresh()
 
-    def _display_centered_text_in_box(self, stdscr, content, start_y, start_x, box_width):
+    def _display_centered_text_in_box(
+        self, stdscr, content, start_y, start_x, box_width
+    ):
         for i, (message, color_pair) in enumerate(content):
             # Calculate position to center the text inside the box
             x_position = start_x + (box_width - 4 - len(message)) // 2
@@ -68,11 +70,11 @@ class Sections:
         _, width = self.stdscr.getmaxyx()
 
         messages = [
-            ("Are you sure you want to delete the following item?", 4), 
+            ("Are you sure you want to delete the following item?", 4),
             ("", 0),
-            (f"'{selected_item.display(width - 9)}'", 1), 
+            (f"'{selected_item.display(width - 9)}'", 1),
             ("", 0),
-            ("(y)es / (n)o [default: n]", 7),  
+            ("(y)es / (n)o [default: n]", 7),
         ]
 
         self.display_centered_text_in_box(messages)
@@ -89,17 +91,17 @@ class Sections:
     def show_help(self):
         """Show help section with colors and proper alignment."""
         help_content = [
-            ("Help", 1), 
-            ("-------------", 2),  
+            ("Help", 1),
+            ("-------------", 2),
             ("Use ↑ UP and ↓ DOWN arrows to navigate the menu.", 3),
             ("", 0),
             ("Press ENTER to select an item.", 3),
             ("", 0),
-            ("/ filter: Filter items", 3), 
+            ("/ filter: Filter items", 3),
             ("", 0),
             ("Ctrl + D: Delete item", 3),
             ("", 0),
-            ("Ctrl + S: Sort items", 3), 
+            ("Ctrl + S: Sort items", 3),
             ("", 0),
             ("Home: Go to the first item.", 3),
             ("", 0),
@@ -107,10 +109,10 @@ class Sections:
             ("", 0),
             ("Ctrl + H: Show this help screen.", 3),
             ("", 0),
-            ("Ctrl + Q: Quit.", 3),  
+            ("Ctrl + Q: Quit.", 3),
             ("", 0),
             ("", 0),
-            ("Press any key to go back to the menu...", 7), 
+            ("Press any key to go back to the menu...", 7),
         ]
 
         self.display_centered_text_in_box(help_content)

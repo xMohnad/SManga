@@ -1,11 +1,12 @@
-import typer
-import sys
+import curses
 import os
+import sys
 from pathlib import Path
 
-import curses
-from .components import SpiderDataProcessor
-from .interface import UI
+import typer
+
+from ..core import SpiderDataProcessor
+from ..interface import UI
 
 # Constants
 current_dir = Path.cwd()
@@ -16,12 +17,14 @@ app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
+
 # Helper Functions
 def change_dir():
     """Change the working directory to the project root."""
     project_root = Path(__file__).resolve().parent.parent
     sys.path.append(str(project_root))
     os.chdir(project_root)
+
 
 def type_file(file_path: Path) -> Path:
     """Validate if the given path is a file."""
@@ -31,19 +34,20 @@ def type_file(file_path: Path) -> Path:
         raise typer.BadParameter(f"'{file_path}' is not a file.")
     return file_path
 
+
 # Commands
 @app.command()
 def crawl(
     link: str = typer.Argument(None, help="The link to scrape."),
     file: str = typer.Option(
-    None, 
-    "-f", 
-    "--file", 
-    help=(
-        "The name of the file to save the scraped data. "
-        "If not provided, the manga's name will be used as the file name. "
+        None,
+        "-f",
+        "--file",
+        help=(
+            "The name of the file to save the scraped data. "
+            "If not provided, the manga's name will be used as the file name. "
+        ),
     ),
-),
     overwrite: bool = typer.Option(
         False, "-o", "--overwrite", help="Overwrite existing file if it exists."
     ),
@@ -70,7 +74,7 @@ def crawl(
         raise typer.BadParameter(f"The Link '{link}' is invalid.")
 
     change_dir()
-    from .components.manga_scraper import SManga  # Maintain this import here
+    from ..core.scraper import SManga  # Maintain this import here
 
     smanga = SManga(
         url=link,
@@ -81,18 +85,22 @@ def crawl(
     )
     smanga.start(spider_name=spider)
 
-
-    if hasattr(smanga, "final_file_path") and smanga.final_file_path.suffix.lower() == ".json":
+    if (
+        hasattr(smanga, "final_file_path")
+        and smanga.final_file_path.suffix.lower() == ".json"
+    ):
         smanga.process_spider_data()
+
 
 @app.command()
 def list():
     """List all available spiders."""
     change_dir()
-    from .components.manga_scraper import SManga  # Maintain this import here
+    from ..core.scraper import SManga  # Maintain this import here
 
     smanga = SManga()
     smanga.print_spiders()
+
 
 @app.command()
 def add(
@@ -105,6 +113,7 @@ def add(
     processor = SpiderDataProcessor(spider_name)
     json_file = current_dir / json_file
     processor.process_data(json_file)
+
 
 if __name__ == "__main__":
     app()
