@@ -1,10 +1,13 @@
-from scrapy.http import Response
-from SManga.lib.themes import BaseSpider
 from typing import List, Optional
+
+from scrapy.http import Response
+
+from SManga.lib.themes import BaseSpider
+
 
 class TeamxSpider(BaseSpider):
     name = "TeamX"
-    base_url = "https://teamoney.site/"
+    base_url = "https://olympustaff.com/"
     language = "Ara"
 
     manganame_selector = "div.author-info-title h6::text"
@@ -21,7 +24,9 @@ class TeamxSpider(BaseSpider):
         chapter_title = f"الفصل {chapter_number}"
         return (
             f"{chapter_title} - {headingb}"
-            if headingb and headingb != chapter_number and headingb != f"الفصل رقم {chapter_number}"
+            if headingb
+            and headingb != chapter_number
+            and headingb != f"الفصل رقم {chapter_number}"
             else chapter_title
         )
 
@@ -29,7 +34,7 @@ class TeamxSpider(BaseSpider):
         image = response.css("div.page-break img")
         return [self.image_from_element(img).strip() for img in image] if image else []
 
-    # details data 
+    # details data
 
     def extract_manga_name(self, response: Response):
         manga_name = response.css(self.manganame_selector).get()
@@ -39,7 +44,9 @@ class TeamxSpider(BaseSpider):
         return self.image_from_element(response.css("img.shadow-sm"))
 
     def extract_description(self, response: Response) -> Optional[str]:
-        description = response.css("div.whitebox.shadow-sm div.review-content p::text").get()
+        description = response.css(
+            "div.whitebox.shadow-sm div.review-content p::text"
+        ).get()
         return description.strip() if description else "الوصف غير متوفر"
 
     def extract_genre(self, response: Response) -> List[str]:
