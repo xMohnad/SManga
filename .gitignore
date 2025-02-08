@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 
 # test
-/test
+/test*
 test.py
 
 # json 
