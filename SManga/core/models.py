@@ -26,4 +26,4 @@ class ProcessedEntry(TypedDict):
     site: str
     manganame: str
     lastchapter: str
-    json_file: str
+    json_file: Optional[str]

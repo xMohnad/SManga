@@ -75,7 +75,6 @@ class CustomJsonFeed:
                 self.data["details"] = item_dict["details"]
                 if not self.file_name:
                     self.file_name = self.generate_file_name(item_dict["details"])
-                    print(self.file_name)
             if "chapters" in item_dict:
                 self.data["chapters"].append(item_dict["chapters"])
         return item
@@ -133,5 +132,5 @@ class CustomJsonFeed:
             spider.logger.error("Destination path is None")
             return
 
-        spider.smanga.final_file_path = self.dest_path / self.file_name
-        # spider.smanga.custom_json_feed = self
+        self.scraped_file_path = self.dest_path / self.file_name
+        spider.smanga.custom_json_feed = self

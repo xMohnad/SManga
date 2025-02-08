@@ -6,8 +6,11 @@ from .models import Chapter, MangaDetails, ProcessedEntry, ScrapedData
 
 
 class MangaDataProcessor:
-    def __init__(self, source_name: str = "?") -> None:
+    def __init__(
+        self, source_name: str = "?", scraped_file_path: Optional[Path] = None
+    ) -> None:
         self.source_name = source_name
+        self.scraped_file_path = scraped_file_path
         self.data_directory = Path.home() / ".spider_data"
         self.processed_data_path = self.data_directory / "processed_data.json"
         self.data_directory.mkdir(parents=True, exist_ok=True)
@@ -32,10 +35,10 @@ class MangaDataProcessor:
         except (IOError, OSError) as error:
             print(f"Error saving JSON to {file_path}: {error}")
 
-    def _read_scraped_data(self, file_path: Path) -> ScrapedData:
+    def _read_scraped_data(self) -> Optional[ScrapedData]:
         """Read the latest scraped data from the file."""
-        data = self._load_json_file(file_path, {})
-        return cast(ScrapedData, data)  # Cast the loaded data to ScrapedData
+        if self.scraped_file_path:
+            return cast(ScrapedData, self._load_json_file(self.scraped_file_path, {}))
 
     def _create_processed_entry(
         self, last_chapter: Chapter, scraped_details: MangaDetails
@@ -45,7 +48,9 @@ class MangaDataProcessor:
             "site": scraped_details.get("source", self.source_name),
             "manganame": scraped_details.get("manganame", "Unknown"),
             "lastchapter": last_chapter.get("document_location", "Unknown"),
-            "json_file": self.file_name.name,
+            "json_file": self.scraped_file_path.name
+            if self.scraped_file_path
+            else None,
         }
 
     def _update_or_add_entry(
@@ -63,15 +68,26 @@ class MangaDataProcessor:
         return existing_data
 
     def process_scraped_data(
-        self, scraped_file_path: Path, scraped_data: Optional[ScrapedData] = None
+        self,
+        scraped_data: Optional[ScrapedData] = None,
+        scraped_file_path: Optional[Path] = None,
     ) -> None:
         """Process the scraped data and update or append it to the data file."""
-        self.file_name = scraped_file_path
+
+        if scraped_data is None and scraped_file_path is None:
+            raise ValueError(
+                "Either 'scraped_data' or 'scraped_file_path' must be provided."
+            )
+
+        if scraped_file_path:
+            self.scraped_file_path = scraped_file_path
 
         existing_data = cast(
             List[ProcessedEntry], self._load_json_file(self.processed_data_path)
         )
-        scraped_data = scraped_data or self._read_scraped_data(scraped_file_path)
+        scraped_data = scraped_data or self._read_scraped_data()
+        if not scraped_data:
+            return
 
         chapters = scraped_data.get("chapters", [])
         if not chapters:

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Optional
+from typing import List, Optional
 
 from rich import print
 from scrapy.crawler import CrawlerProcess
@@ -8,6 +8,8 @@ from scrapy.spiderloader import SpiderLoader
 from scrapy.utils.project import get_project_settings
 
 from SManga.core import MangaDataProcessor
+from SManga.core.models import ProcessedEntry
+from SManga.pipelines import CustomJsonFeed
 
 # Constants
 SUPPORTED_FORMATS = ["json", "jsonlines", "jl", "xml", "pickle", "marshal"]
@@ -37,7 +39,7 @@ class SManga:
         self.list_spiders = self.spider_loader.list()
         self.processor: Optional[MangaDataProcessor] = None
         self.spider_name: Optional[str] = None
-        self.final_file_path: Optional[Path] = None
+        self.custom_json_feed: Optional[CustomJsonFeed] = None
 
     # Validation Methods
     def _validate_file_format(self, file_name: Optional[Path]) -> str:
@@ -81,9 +83,9 @@ class SManga:
         settings_dict = {**get_project_settings()}
 
         if file_name:
-            self.final_file_path = dest_path / file_name
+            final_file_path = dest_path / file_name
             settings_dict["FEEDS"] = {
-                str(self.final_file_path): {
+                str(final_file_path): {
                     "format": file_format,
                     "overwrite": overwrite,
                 }
@@ -131,13 +133,13 @@ class SManga:
         process.crawl(self.spider_name, url=self.url, smanga=self)
         process.start()
 
-    # Data Processing
-    def process_spider_data(self) -> None:
-        """Processes the scraped data."""
-        if self.processor and self.final_file_path:
-            self.processor.process_scraped_data(self.final_file_path)
+        if self.custom_json_feed:
+            self.processor.process_scraped_data(
+                self.custom_json_feed.data,  # pyright: ignore
+                self.custom_json_feed.scraped_file_path,
+            )
 
-    def load_processed_data(self) -> Any:
+    def load_processed_data(self) -> Optional[List[ProcessedEntry]]:
         """Loads the processed data."""
         if self.processor:
             return self.processor.load_processed_data()
