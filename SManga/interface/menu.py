@@ -1,6 +1,6 @@
 import curses
 
-from SManga.core import SpiderDataProcessor
+from SManga.core import MangaDataProcessor
 
 from .menu_item import MenuItem
 from .sections import Sections
@@ -377,8 +377,8 @@ class Menu:
 
     def _save_data(self):
         """Save the current items to JSON."""
-        processor = SpiderDataProcessor()
-        processor._save_data(
+        processor = MangaDataProcessor()
+        processor._save_json_file(
             processor.processed_data_path, [item.__dict__ for item in self.items]
         )
 

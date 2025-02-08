@@ -1,4 +1,4 @@
-from SManga.core import SpiderDataProcessor
+from SManga.core import MangaDataProcessor
 
 
 class MenuItem:
@@ -13,7 +13,7 @@ class MenuItem:
     @classmethod
     def load_menu_items_from_json(cls):
         """Load menu items from processed JSON data."""
-        processor = SpiderDataProcessor()
+        processor = MangaDataProcessor()
         processed_data = processor.load_processed_data()
 
         if not processed_data:

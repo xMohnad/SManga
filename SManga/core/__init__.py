@@ -1,1 +1,1 @@
-from .processor import SpiderDataProcessor
+from .processor import MangaDataProcessor

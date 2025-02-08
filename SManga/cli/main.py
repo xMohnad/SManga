@@ -5,7 +5,7 @@ from pathlib import Path
 
 import typer
 
-from ..core import SpiderDataProcessor
+from ..core import MangaDataProcessor
 from ..interface import UI
 
 # Constants
@@ -110,9 +110,9 @@ def add(
     spider_name: str = typer.Argument(..., help="The spider used for crawling data."),
 ):
     """Add a manga for future crawling to enable the -r option later."""
-    processor = SpiderDataProcessor(spider_name)
+    processor = MangaDataProcessor(spider_name)
     json_file = current_dir / json_file
-    processor.process_data(json_file)
+    processor.process_scraped_data(json_file)
 
 
 if __name__ == "__main__":
