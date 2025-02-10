@@ -1,3 +1,5 @@
+import os
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -13,6 +15,14 @@ from SManga.pipelines import CustomJsonFeed
 
 # Constants
 SUPPORTED_FORMATS = ["json", "jsonlines", "jl", "xml", "pickle", "marshal"]
+
+
+# Helper Function
+def change_dir():
+    """Change the working directory to the project root."""
+    project_root = Path(__file__).resolve().parent.parent
+    sys.path.append(str(project_root))
+    os.chdir(project_root)
 
 
 class SManga:
@@ -31,6 +41,7 @@ class SManga:
         self.overwrite = overwrite
         self.file_format = self._validate_file_format(file_name)
 
+        change_dir()
         # Prepare process settings and spider loader
         self.process_settings = self._prepare_settings(
             file_name, self.file_format, overwrite, user_agent, self.dest_path
@@ -149,4 +160,3 @@ class SManga:
 # Example usage:
 # smanga = SManga(url="https://3asq.org/manga/jujutsu-kaisen/256/")
 # smanga.start()
-# smanga.process_spider_data()
