@@ -651,7 +651,6 @@ class TrashList(BaseList):
         if manga_list.has_class("hidden"):
             manga_list.remove_class("hidden")
             self.add_class("hidden")
-            self.update_message(f"{len(manga_list.filtered_manga)} Manga")
             self.update_message(
                 f"{len(manga_list.filtered_manga)} Manga"
                 if manga_list.filtered_manga
@@ -698,11 +697,17 @@ class MangaBrowser(App):
 
     def on_mount(self) -> None:
         manga_list = self.query_one("#manga-list", MangaList)
+        trash_list = self.query_one("#trash-list", TrashList)
         message = self.query_one(".list-message", Static)
+
         if not manga_list.manga:
             manga_list.add_class("hidden")
             message.add_class("no-manga")
             message.update("No Manga available yet.")
+            if not trash_list.manga:
+                message.update("No Manga and Trash available yet.")
+                trash_list.remove()
+                manga_list.remove()
         else:
             message.update(f"{len(manga_list.filtered_manga)} Manga")
 
