@@ -1,11 +1,12 @@
-import curses
+import json
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 
-from ..core import MangaDataProcessor
-from ..interface import UI
+from SManga.core.models import LastChapter
+from SManga.core.processor import LastChapterManager
+from SManga.interface import MangaBrowser
 
 # Typer app configuration
 app = typer.Typer(
@@ -65,16 +66,16 @@ def crawl(
 ):
     """Crawl a specific manga site to scrape chapter data."""
     if recent:
-        item = curses.wrapper(UI)
-        if not item:
+        last_chapter: Optional[LastChapter] = MangaBrowser().run()
+        if not last_chapter:
             return
 
-        link = item.lastchapter
-        file = file or Path(item.json_file)
-        if isinstance(file, str):
-            file = Path(file.name)
+        link = last_chapter.last_chapter
+        file = file or Path(last_chapter.file_name)
+        spider = spider or last_chapter.site
     else:
         link = validate_link(link)
+
     from ..core.scraper import SManga
 
     smanga = SManga(
@@ -110,8 +111,19 @@ def add(
     ],
 ):
     """Add a manga for future crawling to enable the -r option later."""
-    processor = MangaDataProcessor()
-    processor.process_scraped_data(scraped_file_path=scraped_file_path)
+    manager = LastChapterManager()
+    data = json.loads(scraped_file_path.read_text())
+    scraped_details = data["details"]
+    last_chapter = data["chapters"][-1]
+
+    last_chapter_data = LastChapter(
+        site=scraped_details.get("source"),
+        name=scraped_details.get("manganame"),
+        last_chapter=last_chapter.get("document_location"),
+        file_name=scraped_file_path.name,
+    )
+
+    manager.add_or_update_entry(last_chapter_data)
 
 
 if __name__ == "__main__":
