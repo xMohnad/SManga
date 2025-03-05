@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional, Union
 from itemadapter.adapter import ItemAdapter
 from scrapy import signals
 
+from SManga.core.models import LastChapter
+
 
 class CustomJsonFeed:
     def __init__(
@@ -131,6 +133,16 @@ class CustomJsonFeed:
         if self.dest_path is None:
             spider.logger.error("Destination path is None")
             return
+
+        scraped_details = self.data["details"]
+        last_chapter = self.data["chapters"][-1]
+
+        self.last_chapter_data = LastChapter(
+            site=scraped_details.get("source"),
+            name=scraped_details.get("manganame"),
+            last_chapter=last_chapter.get("document_location"),
+            file_name=self.file_name,
+        )
 
         self.scraped_file_path = self.dest_path / self.file_name
         spider.smanga.custom_json_feed = self
