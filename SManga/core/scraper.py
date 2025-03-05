@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from rich import print
 from scrapy.crawler import CrawlerProcess
@@ -9,8 +9,7 @@ from scrapy.settings import Settings
 from scrapy.spiderloader import SpiderLoader
 from scrapy.utils.project import get_project_settings
 
-from SManga.core import MangaDataProcessor
-from SManga.core.models import ProcessedEntry
+from SManga.core.processor import LastChapterManager
 from SManga.pipelines import CustomJsonFeed
 
 # Constants
@@ -48,7 +47,6 @@ class SManga:
         )
         self.spider_loader = SpiderLoader.from_settings(self.process_settings)
         self.list_spiders = self.spider_loader.list()
-        self.processor: Optional[MangaDataProcessor] = None
         self.spider_name: Optional[str] = None
         self.custom_json_feed: Optional[CustomJsonFeed] = None
 
@@ -137,24 +135,16 @@ class SManga:
         """Starts the crawling process using the appropriate spider."""
         self.spider_name = self._validate_spider(spider_name)
 
-        # Initialize the processor and start the crawling process
-        self.processor = MangaDataProcessor(self.spider_name)
         process = CrawlerProcess(self.process_settings)
 
         process.crawl(self.spider_name, url=self.url, smanga=self)
         process.start()
 
-        if self.custom_json_feed:
-            self.processor.process_scraped_data(
-                self.custom_json_feed.data,  # pyright: ignore
-                self.custom_json_feed.scraped_file_path,
-            )
-
-    def load_processed_data(self) -> Optional[List[ProcessedEntry]]:
-        """Loads the processed data."""
-        if self.processor:
-            return self.processor.load_processed_data()
-        return None
+        if self.custom_json_feed is not None and hasattr(
+            self.custom_json_feed, "last_chapter_data"
+        ):
+            manager = LastChapterManager()
+            manager.add_or_update_entry(self.custom_json_feed.last_chapter_data)
 
 
 # Example usage:

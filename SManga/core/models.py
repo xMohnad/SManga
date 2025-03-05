@@ -1,3 +1,4 @@
+from dataclasses import asdict, dataclass, fields
 from typing import List, Optional, TypedDict
 
 
@@ -22,8 +23,27 @@ class ScrapedData(TypedDict):
     chapters: List[Chapter]
 
 
-class ProcessedEntry(TypedDict):
+@dataclass
+class LastChapter:
     site: str
-    manganame: str
-    lastchapter: str
-    json_file: Optional[str]
+    name: str
+    last_chapter: str
+    file_name: str
+
+    @property
+    def asdict(self):
+        def filter_fields(field_list):
+            return {
+                f.name: getattr(self, f.name)
+                for f in field_list
+                if not f.metadata.get("exclude", False)
+            }
+
+        return asdict(self, dict_factory=lambda _: filter_fields(fields(self)))
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            return self.site == other.get("site") and self.name == other.get("name")
+        elif isinstance(other, LastChapter):
+            return self.site == other.site and self.name == other.name
+        return False

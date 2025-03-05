@@ -1,109 +1,143 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Dict, List
 
-from .models import Chapter, MangaDetails, ProcessedEntry, ScrapedData
+from .models import LastChapter
 
 
-class MangaDataProcessor:
-    def __init__(
-        self, source_name: str = "?", scraped_file_path: Optional[Path] = None
-    ) -> None:
-        self.source_name = source_name
-        self.scraped_file_path = scraped_file_path
-        self.data_directory = Path.home() / ".spider_data"
-        self.processed_data_path = self.data_directory / "processed_data.json"
+class BaseManager:
+    """
+    Base class to manage JSON data storage.
+
+    Attributes:
+        data_directory (Path): The directory where JSON files are stored.
+        json_file (Path): The path to the specific JSON file.
+    """
+
+    def __init__(self, json_filename: str):
+        """
+        Initializes the BaseManager and ensures the data directory exists.
+
+        Args:
+            json_filename (str): The name of the JSON file.
+        """
+        self.data_directory = Path.home() / ".smanga"
+        self.json_file = self.data_directory / json_filename
         self.data_directory.mkdir(parents=True, exist_ok=True)
+        self.data = self._load_data()
 
-    def _load_json_file(self, path: Path, default: Any = []) -> List[Dict[str, Any]]:
-        """Load data from a file, returning a default value if the file does not exist or contains invalid data."""
-        if not path.is_file():
-            return default
+    def get_all_entries(self) -> List[Dict]:
+        """
+        Retrieves all entries from the JSON file.
 
-        try:
-            with open(path, "r") as file:
+        Returns:
+            List[Dict]: A list of all entries.
+        """
+        return self.data
+
+    def add_or_update_entry(self, last_chapter: LastChapter) -> None:
+        """
+        Adds or updates an entry in the JSON file.
+
+        Args:
+            last_chapter (LastChapter): The entry to add or update.
+        """
+        for index, entry in enumerate(self.data):
+            if last_chapter == entry:
+                self.data[index] = last_chapter.asdict
+                break
+        else:
+            self.data.append(last_chapter.asdict)
+        self._save_data()
+
+    def update_entry(self, old_manga: LastChapter, updated_manga: LastChapter) -> None:
+        """
+        Updates an entry in the JSON file based on the old and updated manga.
+
+        Args:
+            old_manga (LastChapter): The manga entry before the update.
+            updated_manga (LastChapter): The manga entry after the update.
+        """
+        for index, entry in enumerate(self.data):
+            if old_manga == entry:
+                self.data[index] = updated_manga.asdict
+                break
+        else:
+            self.data.append(updated_manga.asdict)
+        self._save_data()
+
+    def _load_data(self) -> List[Dict]:
+        """
+        Loads the data from the JSON file.
+
+        Returns:
+            List[Dict]: A list of entries from the JSON file. Returns an empty list if the file doesn't exist.
+        """
+        if self.json_file.exists():
+            with open(self.json_file, "r", encoding="utf-8") as file:
                 return json.load(file)
-        except (json.JSONDecodeError, ValueError, IOError) as e:
-            print(f"Failed to load data from {path}: {e}")
-            return default
+        return []
 
-    def _save_json_file(self, file_path: Path, data: Any) -> None:
-        """Save data to a JSON file with proper error handling."""
-        try:
-            with file_path.open("w", encoding="utf-8") as file:
-                json.dump(data, file, ensure_ascii=False, indent=4)
-        except (IOError, OSError) as error:
-            print(f"Error saving JSON to {file_path}: {error}")
+    def _save_data(self) -> None:
+        """
+        Saves the current data to the JSON file.
+        """
+        with open(self.json_file, "w", encoding="utf-8") as file:
+            json.dump(self.data, file, indent=4)
 
-    def _read_scraped_data(self) -> Optional[ScrapedData]:
-        """Read the latest scraped data from the file."""
-        if self.scraped_file_path:
-            return cast(ScrapedData, self._load_json_file(self.scraped_file_path, {}))
 
-    def _create_processed_entry(
-        self, last_chapter: Chapter, scraped_details: MangaDetails
-    ) -> ProcessedEntry:
-        """Create a new processed data entry."""
-        return {
-            "site": scraped_details.get("source", self.source_name),
-            "manganame": scraped_details.get("manganame", "Unknown"),
-            "lastchapter": last_chapter.get("document_location", "Unknown"),
-            "json_file": self.scraped_file_path.name
-            if self.scraped_file_path
-            else None,
-        }
+class LastChapterManager(BaseManager):
+    """Manages the addition, updating, and retrieval of last chapter data."""
 
-    def _update_or_add_entry(
-        self, existing_data: List[ProcessedEntry], new_entry: ProcessedEntry
-    ) -> List[ProcessedEntry]:
-        """Update an existing entry or append a new one."""
-        for index, entry in enumerate(existing_data):
-            if (
-                entry.get("site") == self.source_name
-                and entry.get("manganame") == new_entry["manganame"]
-            ):
-                existing_data[index] = new_entry
-                return existing_data  # Return early if updated
-        existing_data.append(new_entry)
-        return existing_data
+    def __init__(self, trash_manager=None):
+        super().__init__(json_filename="last_chapters.json")
+        self.trash_manager = trash_manager or TrashManager(self)
 
-    def process_scraped_data(
-        self,
-        scraped_data: Optional[ScrapedData] = None,
-        scraped_file_path: Optional[Path] = None,
-    ) -> None:
-        """Process the scraped data and update or append it to the data file."""
+    def delete_entry(self, last_chapter: LastChapter) -> None:
+        """
+        Deletes an entry from the JSON file and moves it to the trash.
 
-        if scraped_data is None and scraped_file_path is None:
-            raise ValueError(
-                "Either 'scraped_data' or 'scraped_file_path' must be provided."
-            )
+        Args:
+            last_chapter (LastChapter): The entry to delete.
+        """
+        self.data = [entry for entry in self.data if last_chapter != entry]
+        self._save_data()
+        self.trash_manager.add_to_trash(last_chapter)
 
-        if scraped_file_path:
-            self.scraped_file_path = scraped_file_path
 
-        existing_data = cast(
-            List[ProcessedEntry], self._load_json_file(self.processed_data_path)
-        )
-        scraped_data = scraped_data or self._read_scraped_data()
-        if not scraped_data:
-            return
+class TrashManager(BaseManager):
+    """Manages the trash for deleted last chapter entries."""
 
-        chapters = scraped_data.get("chapters", [])
-        if not chapters:
-            return
+    def __init__(self, last_chapter_manager=None):
+        super().__init__(json_filename="trash.json")
+        self.last_chapter_manager = last_chapter_manager or LastChapterManager(self)
 
-        new_entry = self._create_processed_entry(
-            chapters[-1], scraped_data.get("details", {})
-        )
+    def add_to_trash(self, last_chapter: LastChapter) -> None:
+        """
+        Adds an entry to the trash.
 
-        if new_entry.get("manganame") and new_entry.get("site"):
-            updated_data = self._update_or_add_entry(existing_data, new_entry)
-            self._save_json_file(
-                self.processed_data_path, cast(List[Dict[str, Any]], updated_data)
-            )
+        Args:
+            last_chapter (LastChapter): The entry to add to the trash.
+        """
+        self.add_or_update_entry(last_chapter)
 
-    def load_processed_data(self) -> Optional[List[ProcessedEntry]]:
-        """Load and return the processed data from the file."""
-        data = self._load_json_file(self.processed_data_path)
-        return cast(List[ProcessedEntry], data) if data else None
+    def restore_entry(self, last_chapter: LastChapter) -> None:
+        """
+        Restores an entry from the trash back to the main list.
+
+        Args:
+            last_chapter (LastChapter): The entry to restore.
+        """
+        self.data = [entry for entry in self.data if last_chapter != entry]
+        self._save_data()
+        self.last_chapter_manager.add_or_update_entry(last_chapter)
+
+    def delete_permanently(self, last_chapter: LastChapter) -> None:
+        """
+        Deletes an entry permanently from the trash.
+
+        Args:
+            last_chapter (LastChapter): The entry to delete permanently.
+        """
+        self.data = [entry for entry in self.data if last_chapter != entry]
+        self._save_data()

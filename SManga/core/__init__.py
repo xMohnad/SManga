@@ -1,1 +1,1 @@
-from .processor import MangaDataProcessor
+from .processor import LastChapterManager
