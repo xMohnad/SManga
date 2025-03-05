@@ -1,0 +1,48 @@
+.list-message {
+    background:  $panel;
+    color: $text-disabled;
+    padding-left: 1;
+}
+
+.no-manga {
+    color: $warning;
+}
+
+TrashList,
+MangaList { 
+    ListItem {
+      height: auto;
+      border-left: wide $boost;
+      Label {
+        padding: 1;
+        }
+        &.-highlight {
+          outline-left: thick $accent;
+        }
+    }
+}
+
+EditMangaForm {
+    Vertical {
+        border: tall blank;
+        background:  $surface;
+        Input {
+            background:  $panel;
+            margin: 1 0;
+        }
+        Label {
+            padding-left: 1;
+            text-align: right;
+        }
+        Horizontal {
+            margin-top: 1;
+            Button {
+                width: 50%;
+            }
+        }
+    }
+}
+
+.hidden {
+    display: none;
+}
