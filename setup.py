@@ -14,7 +14,7 @@ setup(
     name="SManga",
     version="0.4.2",
     description="A CLI tool for scraping manga chapters using Scrapy",
-    packages=find_packages(exclude=["tests*"]),
+    packages=find_packages(),
     install_requires=parse_requirements("requirements.txt"),
     entry_points={
         "console_scripts": [
