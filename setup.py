@@ -12,7 +12,7 @@ def parse_requirements(filename):
 
 setup(
     name="SManga",
-    version="0.4.2",
+    version="0.5.0",
     description="A CLI tool for scraping manga chapters using Scrapy",
     packages=find_packages(),
     install_requires=parse_requirements("requirements.txt"),
